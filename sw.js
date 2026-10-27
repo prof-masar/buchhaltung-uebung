@@ -1,4 +1,4 @@
-const C="buchhaltung-63edbfa9ff";
-self.addEventListener("install",e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(["./","index.html","manifest.json","icon.svg"])));self.skipWaiting();});
+const C="buchhaltung-14c74dc3e8";
+self.addEventListener("install",e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(["./", "index.html", "manifest.json", "icon.svg", "belege/EB1.png?v=23cbf1cd", "belege/ER1.png?v=b9256069", "belege/ER2.png?v=0b0db0fa", "belege/ER3.png?v=3f9c6fbc", "belege/AR1.png?v=dc71b455", "belege/KA1.png?v=0617927c", "belege/AR2.png?v=4c6656b1", "belege/KA2.png?v=508628e5", "belege/ER4.png?v=08a67bcb", "belege/BA1.png?v=a8405ed0", "belege/BA2.png?v=720f87d1", "belege/ER5.png?v=2942bb05", "belege/ER6.png?v=8b8aacd2", "belege/AR3.png?v=9dbf7444", "belege/ER7.png?v=5b63e02e", "belege/AR4.png?v=8e83022c", "belege/KA3.png?v=88961d59", "belege/BA3.png?v=d58910d5", "belege/BA4.png?v=68a8aef9"])));self.skipWaiting();});
 self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))));self.clients.claim();});
 self.addEventListener("fetch",e=>{if(e.request.method!=="GET")return;e.respondWith(fetch(e.request).then(r=>{const c=r.clone();caches.open(C).then(x=>x.put(e.request,c));return r;}).catch(()=>caches.match(e.request,{ignoreSearch:true})));});
