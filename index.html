@@ -387,6 +387,11 @@ tr.inaktiv td{color:#8a94a3;background:#fafbfc}
  .bildpanel .bpbtns .tbtn{min-width:44px;min-height:44px}
  body.bild-offen{overflow:hidden}
 }
+/* Nach „✕“ im Bild-Fenster: Beleg ganz ausgeblendet, Maske über die ganze Breite */
+body.beleg-weg .erf{grid-template-columns:minmax(0,1fr)}
+body.beleg-weg .erf>.bwin{display:none}
+.bwin .bwx{min-width:40px;min-height:36px;justify-content:center;font-size:17px;font-weight:700;margin-left:6px}
+@media (max-width:1180px){.bwin .bwx{min-width:44px;min-height:44px}}
 
 .bl{font-family:"Helvetica Neue",Arial,"Segoe UI",sans-serif;color:#222;background:#fff;font-size:13px;line-height:1.4;box-shadow:0 1px 3px rgba(0,0,0,.12),0 6px 20px rgba(0,0,0,.08)}
 .bl table{border-collapse:collapse;width:100%}
@@ -778,7 +783,9 @@ function fitBelege() {
 window.addEventListener("resize", () => { fitBelege(); closePicker(); });
 /* Beleg-Bild-Ansicht: Desktop als Spalte neben der Maske, sonst Vollbild. Bleibt beim Neuaufbau erhalten (eigener Knoten). */
 const BZ_MIN = 1, BZ_MAX = 4;
-function bildSt() { if (!ST.bild || typeof ST.bild !== "object") ST.bild = { offen: false, zoom: 1, id: null, pos: {} }; if (!ST.bild.pos) ST.bild.pos = {}; return ST.bild; }
+function bildSt() { if (!ST.bild || typeof ST.bild !== "object") ST.bild = { offen: false, zoom: 1, id: null, pos: {} }; if (!ST.bild.pos) ST.bild.pos = {}; ST.bild.offen = false; return ST.bild; } // Bild-Fenster nicht mehr benutzt: „Beleg anzeigen“ zeigt immer die normale Beleg-Ansicht
+// Nach „✕“ ist der Beleg ganz weg (weg = Beleg-ID), die Maske nimmt die ganze Breite. „Beleg anzeigen“ holt ihn zurück; ein anderer Beleg wird wieder normal gezeigt.
+function belegWeg() { const s = bildSt(); return !!(s.weg && s.weg === SEL && !bildOffen() && VIEW === "belegerfassung" && BILDER[SEL]); }
 function bildOffen() { const s = bildSt(); return !!(s.offen && VIEW === "belegerfassung" && SEL && BILDER[SEL]); }
 let BP = null; // der Panel-Knoten
 function bildPanel() {
@@ -808,6 +815,7 @@ function bildZoom(z, cx, cy) {
 function bildZeigen() { // nach jedem render(): Panel einhängen oder entfernen
   const erf = $(".erf"), offen = bildOffen() && erf;
   document.body.classList.toggle("bild-offen", !!offen);
+  document.body.classList.toggle("beleg-weg", !!(erf && belegWeg()));
   if (!offen) { if (BP && BP.parentNode) BP.remove(); return; }
   const s = bildSt(), info = BILDER[SEL], p = bildPanel(), img = p.querySelector("#bp-img");
   s.id = SEL;
@@ -818,8 +826,10 @@ function bildZeigen() { // nach jedem render(): Panel einhängen oder entfernen
   const sc = p.querySelector("#bp-scroll"), zurueck = () => { const q = s.pos[SEL] || [0, 0]; sc.scrollLeft = q[0]; sc.scrollTop = q[1]; };
   zurueck(); if (!img.complete) img.addEventListener("load", zurueck, { once: true });
 }
-function bildAuf(id) { const s = bildSt(); s.offen = true; s.id = id; save(); bildZeigen(); const b = $("#bildbtn"); if (b) b.setAttribute("aria-pressed", "true"); const c = $("#bildpanel .bpclose"); if (c && window.matchMedia("(max-width:1180px)").matches) c.focus(); }
-function bildZu() { const s = bildSt(); if (!s.offen) return false; s.offen = false; save(); bildZeigen(); const b = $("#bildbtn"); if (b) { b.setAttribute("aria-pressed", "false"); b.focus(); } return true; }
+function belegUmschalten(weg) { const s = bildSt(); s.weg = weg ? SEL : null; save(); bildZeigen(); const b = $("#bildbtn"); if (b) b.setAttribute("aria-pressed", weg ? "false" : "true");
+  if (weg) { if (b) b.focus(); } else { const w = $(".erf > .bwin"); if (w && w.scrollIntoView && window.matchMedia("(max-width:1180px)").matches) w.scrollIntoView({ block: "start" }); const x = $(".bwin .bwx"); if (x) x.focus({ preventScroll: true }); } }
+function bildAuf(id) { const s = bildSt(); s.offen = true; s.id = id; s.weg = null; save(); bildZeigen(); const b = $("#bildbtn"); if (b) b.setAttribute("aria-pressed", "true"); const c = $("#bildpanel .bpclose"); if (c && window.matchMedia("(max-width:1180px)").matches) c.focus(); }
+function bildZu() { const s = bildSt(); if (!s.offen) return false; s.offen = false; s.weg = s.id || SEL; save(); bildZeigen(); const b = $("#bildbtn"); if (b) { b.setAttribute("aria-pressed", "false"); b.focus(); } return true; }
 function zoomBeleg(html) { const z = $("#zoom"); $("#zoom .zin").innerHTML = html; z.classList.add("open"); z.scrollTop = 0; $("#zoom .zclose").focus(); }
 const symText = b => b.belegsymbol + "\u00a0" + b.belegnummer;
 
@@ -1385,9 +1395,9 @@ VIEWS.belegerfassung = () => {
     }
   }
   return `${stapelHtml()}<div class="erf">
-   <section class="win bwin" aria-label="Beleg ${esc(b.beleg_id)}"><div class="wtitle"><h1>${icon("belegerfassung", 18)}Beleg ${esc(b.beleg_id)}</h1><button class="tbtn" data-zoom="1" title="Beleg vergrößern">${icon("zoom", 18)}<span>Vergrößern</span></button></div>
+   <section class="win bwin" aria-label="Beleg ${esc(b.beleg_id)}"><div class="wtitle"><h1>${icon("belegerfassung", 18)}Beleg ${esc(b.beleg_id)}</h1><button class="tbtn" data-zoom="1" title="Beleg vergrößern">${icon("zoom", 18)}<span>Vergrößern</span></button>${BILDER[b.beleg_id] ? `<button class="tbtn bwx" data-bz="x" title="Beleg schließen" aria-label="Beleg schließen">✕</button>` : ""}</div>
     <div class="wbody"><div class="beleg-frame" id="belegframe" role="button" tabindex="0" aria-label="Beleg vergrößern"><div class="scaler">${belegHtml(b.beleg, symText(b))}</div></div><div class="zoomhint">Beleg antippen zum Vergrößern</div></div></section>
-   <section class="win mwin" aria-labelledby="wt-belegerfassung"><div class="wtitle"><h1 id="wt-belegerfassung">${icon("belegerfassung", 18)}Buchungsmaske</h1><span class="wpath">Menü: ${esc(MODUL.belegerfassung.menue)}</span>${BILDER[b.beleg_id] ? `<button class="tbtn bildbtn" id="bildbtn" data-bild="${esc(b.beleg_id)}" aria-pressed="${bildOffen() ? "true" : "false"}" title="Originalbeleg als Bild anzeigen">${icon("zoom", 18)}<span>Beleg anzeigen</span></button>` : ""}</div>
+   <section class="win mwin" aria-labelledby="wt-belegerfassung"><div class="wtitle"><h1 id="wt-belegerfassung">${icon("belegerfassung", 18)}Buchungsmaske</h1><span class="wpath">Menü: ${esc(MODUL.belegerfassung.menue)}</span>${BILDER[b.beleg_id] ? `<button class="tbtn bildbtn" id="bildbtn" data-bild="${esc(b.beleg_id)}" aria-pressed="${belegWeg() ? "false" : "true"}" title="Beleg anzeigen oder ausblenden">${icon("zoom", 18)}<span>Beleg anzeigen</span></button>` : ""}</div>
     <div class="wbody"><div class="erkl"><p>${esc(MODUL.belegerfassung.erklaerung)}</p><details id="konv"><summary>Buchungsregeln (so wird gebucht)</summary>${konventionHtml()}</details></div>${maske}</div></section></div>`;
 };
 function kopfFeld(k, val) { return `<div class="kf"><span class="kfl">${esc(k)}${qBtn(k)}</span><output>${esc(val)}</output></div>`; }
@@ -1814,8 +1824,8 @@ function onClick(ev) {
   if (t.id === "sd-speichern") { stammSpeichern(); save(); render(); const el = $("#sd-ergebnis") || $("#anlegen"); if (el && el.scrollIntoView) el.scrollIntoView({ block: "nearest" }); return; }
   if (t.id === "sd-loesung") { const a = SD_AUFG.find(x => x.id === SD_SEL); if (a) { const e = stammEntwurf(a); e.loesung = true; e.werte = {}; Object.entries(a.richtige_eingabe).forEach(([k, v]) => e.werte[k] = typeof v === "number" ? (v ? String(v).replace(".", ",") : "") : String(v));
     SRES = { id: a.id, ok: false, art: "loesung", msg: "So ist es richtig. Vergleiche mit dem Beleg und klicke dann auf „Speichern“.", fehler: {} }; save(); render(); } return; }
-  if (d.bild) { bildOffen() && bildSt().id === d.bild ? bildZu() : bildAuf(d.bild); return; }
-  if (d.bz) { if (d.bz === "x") bildZu(); else if (d.bz === "0") { bildZoom(1); save(); } else { bildZoom(bildSt().zoom * (d.bz === "+" ? 1.25 : 0.8)); save(); } return; }
+  if (d.bild) { belegUmschalten(false); return; } // zeigt den Beleg (normale Ansicht); schließen nur mit „✕“
+  if (d.bz) { if (d.bz === "x") belegUmschalten(true); else if (d.bz === "0") { bildZoom(1); save(); } else { bildZoom(bildSt().zoom * (d.bz === "+" ? 1.25 : 0.8)); save(); } return; }
   if (d.zoomb) { const bb = BEL[d.zoomb]; if (bb) zoomBeleg(belegHtml(bb.beleg, symText(bb))); return; }
   if (t.id === "st-buchen") { stornoBuchen(d.st); render(); const el = $("#st-ergebnis"); if (el && el.scrollIntoView) el.scrollIntoView({ block: "nearest" }); return; }
   if (d.act) { aktion(d.act); return; }
