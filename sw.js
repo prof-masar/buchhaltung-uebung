@@ -1,4 +1,4 @@
-const C="buchhaltung-6e9a1acd51";
+const C="buchhaltung-eb5c85cc62";
 self.addEventListener("install",e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(["./", "index.html", "manifest.json", "icon.svg", "belege/EB1.png?v=7d3f099d", "belege/ER1.png?v=85b989a4", "belege/ER2.png?v=fd54149d", "belege/ER3.png?v=7767b41d", "belege/AR1.png?v=21199798", "belege/KA1.png?v=8ab77adc", "belege/AR2.png?v=b0b5e46b", "belege/KA2.png?v=26308d48", "belege/ER4.png?v=34dfdb0b", "belege/BA1.png?v=c44b9fba", "belege/BA2.png?v=a8c0d726", "belege/ER5.png?v=2f99358d", "belege/ER6.png?v=7f61c407", "belege/AR3.png?v=459d4db9", "belege/ER7.png?v=0cef51c1", "belege/AR4.png?v=a96dd982", "belege/KA3.png?v=d68facea", "belege/BA3.png?v=6ce64b65", "belege/BA4.png?v=12213202"])));self.skipWaiting();});
 self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))));self.clients.claim();});
 self.addEventListener("fetch",e=>{if(e.request.method!=="GET")return;e.respondWith(fetch(e.request).then(r=>{const c=r.clone();caches.open(C).then(x=>x.put(e.request,c));return r;}).catch(()=>caches.match(e.request,{ignoreSearch:true})));});
