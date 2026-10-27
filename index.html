@@ -552,6 +552,7 @@ function evKonten(ev) {
 }
 
 /* ---------- Zustand (nur im Browser gespeichert) ---------- */
+const zeileUnberuehrt = (z, b) => !z || (!z.soll && !z.haben && !String(z.betrag || "").trim() && !z.code && !String(z.op || "").trim() && (!z.text || z.text === (b ? b.text : "")));
 function leer() { return { format: SFORMAT, gebucht: [], info: {}, serie: 0, besteSerie: 0, tour: false, aufgaben: {}, entwurf: {}, stamm: {}, stammEntwurf: {} }; }
 let ALT_RESET = false;  // true, wenn ein alter oder kaputter Speicherstand verworfen wurde
 function aktivIn(s, nr) { return !NEU_PARTNER[nr] || !!(s && s.stamm && s.stamm[nr]); }
@@ -568,6 +569,8 @@ function ladeStand() {
   if (!st.stammEntwurf || typeof st.stammEntwurf !== "object") st.stammEntwurf = {};
   if (!st.stamm) st.stamm = {};
   Object.keys(st.entwurf).forEach(id => { const e = st.entwurf[id]; if (!BEL[id] || !e || !Array.isArray(e.zeilen) || !e.zeilen.length) delete st.entwurf[id]; });
+  // Entwürfe von früher (zwei Zeilen offen): unberührte leere Zeilen am Ende entfernen, mindestens eine Zeile bleibt
+  Object.keys(st.entwurf).forEach(id => { const z = st.entwurf[id].zeilen; while (z.length > 1 && zeileUnberuehrt(z[z.length - 1], BEL[id])) z.pop(); });
   return st;
 }
 let ST = ladeStand();
@@ -1294,7 +1297,7 @@ function neueZeile(b) { return { soll: "", haben: "", betrag: "", code: "", text
 const periodeStart = b => { const p = periodeVon(b.belegdatum); return PERIODEN.some(x => x.periode === p) ? p : b.buchungsperiode; };
 function entwurf(b) {
   let e = ST.entwurf[b.beleg_id];
-  if (!e) e = ST.entwurf[b.beleg_id] = { zeilen: [neueZeile(b), neueZeile(b)], modus: "brutto", versuche: 0, tipp: false, loesung: false, periode: periodeStart(b) };
+  if (!e) e = ST.entwurf[b.beleg_id] = { zeilen: [neueZeile(b)], modus: "brutto", versuche: 0, tipp: false, loesung: false, periode: periodeStart(b) };
   if (e.modus !== "netto") e.modus = "brutto";
   if (!e.periode || !PERIODEN.some(x => x.periode === e.periode)) e.periode = periodeStart(b);
   return e;
@@ -1410,7 +1413,7 @@ function maskeHtml(b) {
      <div class="fld f-satz"><span class="ml">St.-%${qBtn("Steuersatz")}</span><output class="satz" id="ss-${i}">${satzFuer(z.code) || "–"}</output></div>
      <div class="fld f-text"><label class="ml" for="tx-${i}">Text${qBtn("Text")}</label><input id="tx-${i}" data-i="${i}" data-feld="text" data-f="${i}-text" autocomplete="off" value="${esc(z.text)}"></div>
      ${opFeldHtml(b, z, i, e)}
-     <button type="button" class="zdel" data-del="${i}" aria-label="Zeile ${i + 1} löschen" title="Zeile löschen">✕</button>
+     ${e.zeilen.length > 1 ? `<button type="button" class="zdel" data-del="${i}" aria-label="Zeile ${i + 1} löschen" title="Zeile löschen">✕</button>` : ""}
      <div class="zauto" id="za-${i}" aria-live="polite">${autoHtml(z, e.modus)}</div>
      ${mk && mk.hint ? `<div class="zhint">${mk.ok ? "✓" : "✗"} ${esc(mk.hint)}</div>` : ""}
     </div>`;
@@ -1422,7 +1425,7 @@ function maskeHtml(b) {
     <label><input type="radio" name="bmodus" value="netto" data-modus="netto"${bm === "netto" ? " checked" : ""}> Netto (ohne Steuer)</label></div>
    <div class="mhead" aria-hidden="true"><span>#</span><span>Konto (Soll)${qBtn("Konto (Soll)")}</span><span>Gegenkonto (Haben)${qBtn("Gegenkonto (Haben)")}</span><span>Betrag (${bm})${qBtn("Betrag")}</span><span>St.-Code${qBtn("Steuercode")}</span><span>St.-%${qBtn("Steuersatz")}</span><span>Text${qBtn("Text")}</span><span>OP-Nr.${qBtn("OP-Nummer")}</span><span></span></div>
    ${zeilen}
-   <div class="mfoot"><button type="button" class="btn" id="addz" title="Alt+N">+ Zeile</button><button type="button" class="btn" id="leeren">Eingaben leeren</button><span class="msum" id="msumbox">${summenHtml(e)}</span></div>
+   <div class="mfoot"><button type="button" class="btn" id="addz" title="Neue Buchungszeile (Alt+N)">+ Neue Zeile</button><button type="button" class="btn" id="leeren">Eingaben leeren</button><span class="msum" id="msumbox">${summenHtml(e)}</span></div>
    <div class="serie ${ST.serie ? "" : "leer"}" id="serie" data-serie="${ST.serie}">${ST.serie ? `${FLAMME}<span>${ST.serie} richtig in Folge</span>` : ""}</div>
    <div class="btnrow main"><button type="button" class="btn" id="tipp">💡 Tipp</button><button type="button" class="btn primary big" id="buchen" title="Strg+Enter">Buchen</button></div>
    <div id="tippbox">${e.tipp ? tippHtml(b) : ""}</div>
@@ -1813,7 +1816,7 @@ function onClick(ev) {
   const b = BEL[SEL];
   if (d.del != null) { const e = entwurf(b); e.zeilen.splice(Number(d.del), 1); if (!e.zeilen.length) e.zeilen.push(neueZeile(b)); RES = null; save(); renderMaske(); return; }
   if (t.id === "addz") { const e = entwurf(b); e.zeilen.push(neueZeile(b)); save(); renderMaske(`${e.zeilen.length - 1}-soll`); return; }
-  if (t.id === "leeren") { const e = entwurf(b); e.zeilen = [neueZeile(b), neueZeile(b)]; RES = null; save(); renderMaske("0-soll"); return; }
+  if (t.id === "leeren") { const e = entwurf(b); e.zeilen = [neueZeile(b)]; RES = null; save(); renderMaske("0-soll"); return; }
   if (t.id === "buchen") { buchen(); return; }
   if (t.id === "tipp") { const e = entwurf(b); e.tipp = true; save(); $("#tippbox").innerHTML = tippHtml(b); return; }
   if (t.id === "loesung") { const e = entwurf(b); e.loesung = true;
